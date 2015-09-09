@@ -8,6 +8,11 @@ Set up a python virtualenv and pip install into it, or install the python requir
 ```
 sudo pip install -r requirements.txt
 ```
+If you are on OSX and get an error about an include file named ffi.h when the install is building
+cffi, then you might need to install XCode command line tools. You can do so with this command:
+```
+xcode-select --install
+```
 Start up the server with something like below.
 Note: the www.edx.org value is a placeholder and your actual jenkins URL will be used instead
 when the forward proxy script kicks in.
