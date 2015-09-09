@@ -1,0 +1,15 @@
+sudo: false
+language: python
+branches:
+    only:
+      - master
+python:
+  - "2.7"
+install:
+  - pip install -r test-requirements.txt
+script:
+  - pep8 .
+  # - coverage run --source=testeng_triggers -m nose
+# after_success:
+  # - pip install coveralls
+  # - coveralls
