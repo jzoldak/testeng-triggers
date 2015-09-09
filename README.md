@@ -8,16 +8,9 @@ Set up a python virtualenv and pip install into it, or install the python requir
 ```
 sudo pip install -r requirements.txt
 ```
-If you are on OSX and get an error about an include file named ffi.h when the install is building
-cffi, then you might need to install XCode command line tools. You can do so with this command:
+Start up the server:
 ```
-xcode-select --install
-```
-Start up the server with something like below.
-Note: the www.edx.org value is a placeholder and your actual jenkins URL will be used instead
-when the forward proxy script kicks in.
-```
-mitmdump -s testeng_triggers/testeng_triggers.py -p 8888 -R http://www.edx.org
+testeng_triggers/testeng_triggers.py
 ```
 
 Make a request. Substitue the payload below with your event name that will trigger the logic
@@ -32,3 +25,4 @@ To deploy on heroku:
 * In the heroku app dashboard, under Settings, add Config var values for environment variables that your script needs.
 * You can now test out the forward proxy with the above curl statement, using the URL of your heroku app instead
 of localhost. Either http or https will work, heroku handles the routing for you.
+
