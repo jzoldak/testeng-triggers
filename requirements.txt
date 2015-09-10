@@ -1,2 +1,2 @@
-cffi==1.2.1
-mitmproxy==0.13
+lazy==1.2
+requests[security]==2.7.0
