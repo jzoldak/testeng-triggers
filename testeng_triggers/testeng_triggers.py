@@ -21,6 +21,7 @@ JENKINS_USER_NAME = os.environ.get('JENKINS_USER_NAME', 'foo')
 JENKINS_USER_TOKEN = os.environ.get('JENKINS_USER_TOKEN', 'bar')  # get this from JENKINS_BASE/me/configure
 JENKINS_LINK = '{}{}{}?{}&{}'.format(JENKINS_BASE, JENKINS_JOB, JENKINS_BUILD_CMD, JENKINS_TOKEN, JENKINS_PARAM)
 
+
 class StubHttpRequestHandler(BaseHTTPRequestHandler, object):
     """
     Handler for the stub HTTP service.
@@ -179,7 +180,8 @@ class StubHttpRequestHandler(BaseHTTPRequestHandler, object):
 
 
 def run(server_class=HTTPServer, handler_class=StubHttpRequestHandler):
-    server_address = ('', 8888)
+    port = int(os.environ.get('PORT', '8888'))
+    server_address = ('', port)
     httpd = server_class(server_address, handler_class)
     httpd.serve_forever()
 
