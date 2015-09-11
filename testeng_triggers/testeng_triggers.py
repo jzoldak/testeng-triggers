@@ -167,7 +167,9 @@ class StubHttpRequestHandler(BaseHTTPRequestHandler, object):
             data = json.loads(self.request_content)
             repo = data.get('repository')
             repo_name = repo.get('full_name')
-
+            self.log_message(
+                "Sending GET reqeust to: {0} with credentials '{1}:{2}'".format(JENKINS_LINK, JENKINS_USER_NAME, JENKINS_USER_TOKEN)
+            )
             resp = requests.get(JENKINS_LINK, auth=(JENKINS_USER_NAME, JENKINS_USER_TOKEN))
 
         self.send_response(200)
