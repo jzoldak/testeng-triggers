@@ -15,11 +15,11 @@ LOGGER = getLogger(__name__)
 JENKINS_BASE = os.environ.get('JENKINS_BASE', 'https://test-jenkins.testeng.edx.org')
 JENKINS_JOB = os.environ.get('JENKINS_JOB', '/job/jz-test-project')
 JENKINS_BUILD_CMD = os.environ.get('JENKINS_BUILD_CMD', '/buildWithParameters')
-JENKINS_TOKEN = os.environ.get('JENKINS_TOKEN', 'token=FOO')
+JENKINS_TOKEN = os.environ.get('JENKINS_TOKEN', 'FOO')
 JENKINS_PARAM = os.environ.get('JENKINS_PARAM', 'EXIT_CODE=0')
 JENKINS_USER_NAME = os.environ.get('JENKINS_USER_NAME', 'foo')
 JENKINS_USER_TOKEN = os.environ.get('JENKINS_USER_TOKEN', 'bar')  # get this from JENKINS_BASE/me/configure
-JENKINS_LINK = '{}{}{}?{}&{}'.format(JENKINS_BASE, JENKINS_JOB, JENKINS_BUILD_CMD, JENKINS_TOKEN, JENKINS_PARAM)
+JENKINS_LINK = '{}{}{}?token={}&{}'.format(JENKINS_BASE, JENKINS_JOB, JENKINS_BUILD_CMD, JENKINS_TOKEN, JENKINS_PARAM)
 
 
 class StubHttpRequestHandler(BaseHTTPRequestHandler, object):
