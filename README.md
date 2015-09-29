@@ -26,3 +26,23 @@ To deploy on heroku:
 * You can now test out the forward proxy with the above curl statement, using the URL of your heroku app instead
 of localhost. Either http or https will work, heroku handles the routing for you.
 
+Verifying the code:
+
+First install the requirements:
+```
+pip install -r test-requirements.txt
+```
+To check for pep8 violations:
+```
+pep8 .
+```
+To run all tests:
+```
+nosetests
+```
+To run a single test, add the testspec to the nosetests command. Here are some examples:
+```
+nosetests testeng_triggers/test/test_helpers.py
+nosetests testeng_triggers/test/test_helpers.py:TriggerHelpersTestCase
+nosetests testeng_triggers/test/test_helpers.py:TriggerHelpersTestCase.test_deployment_event
+```
