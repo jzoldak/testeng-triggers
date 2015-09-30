@@ -3,10 +3,8 @@
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 import urlparse
 import threading
-import json
 
 from lazy import lazy
-import requests
 
 from helpers import trigger_jenkins_job
 

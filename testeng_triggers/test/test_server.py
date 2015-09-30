@@ -1,5 +1,5 @@
 """
-Tests for testeng-triggers
+Tests for the HTTP server
 """
 from unittest import TestCase
 

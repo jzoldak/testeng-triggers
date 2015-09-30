@@ -12,6 +12,7 @@ JENKINS_USER_NAME = os.environ.get('JENKINS_USER_NAME', 'foo')
 JENKINS_USER_TOKEN = os.environ.get('JENKINS_USER_TOKEN', 'bar')  # get this from JENKINS_BASE/me/configure
 JENKINS_LINK = '{}{}{}?token={}&{}'.format(JENKINS_BASE, JENKINS_JOB, JENKINS_BUILD_CMD, JENKINS_TOKEN, JENKINS_PARAM)
 
+HANDLED_REPO = 'jzoldak/testeng-triggers'
 
 def trigger_jenkins_job(event, data):
     """Parse the WebHook payload and trigger
@@ -26,12 +27,12 @@ def trigger_jenkins_job(event, data):
     """
     repo = data.get('repository')
     if not repo:
-        # This isn't a valid webhook from GitHub because
-        # they all return the repository info in the JSON
+        # This is not a valid webhook from GitHub because
+        # those all return the repository info in the JSON payload
         return 400
 
     repo_name = repo.get('full_name')
-    if repo_name is not 'jzoldak/testeng-triggers':
+    if repo_name != HANDLED_REPO:
         # We only want to take action on a specific repo, so
         # even if another repo gets configured to send webhooks
         # to this app
@@ -43,4 +44,4 @@ def trigger_jenkins_job(event, data):
         )
         # resp = requests.get(JENKINS_LINK, auth=(JENKINS_USER_NAME, JENKINS_USER_TOKEN))
 
-    return 200
+    return 500
