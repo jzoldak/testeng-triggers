@@ -11,13 +11,20 @@ class TriggerHelpersTestCase(TestCase):
     """TestCase class for verifying the helper methods. """
 
     def test_bad_payload(self):
-        code = trigger_jenkins_job('foo', {})
-        self.assertEqual(code, 400)
+        self.assertRaises(ValueError, trigger_jenkins_job, 'foo', {})
 
     def test_untriggered_repo(self):
-        code = trigger_jenkins_job('foo', {"repository": {"full_name": "foo/untriggered"}})
-        self.assertEqual(code, 200)
+        result = trigger_jenkins_job('foo', {"repository": {"full_name": "foo/untriggered"}})
+        self.assertEqual(result, None)
 
     def test_untriggered_event(self):
-        code = trigger_jenkins_job('foo', {"repository": {"full_name": "foo/bar"}})
-        self.assertEqual(code, 200)
+        result = trigger_jenkins_job('foo', {"repository": {"full_name": "foo/bar"}})
+        self.assertEqual(result, None)
+
+    def test_deployment_event(self):
+        result = trigger_jenkins_job(
+            'deployment',
+            {"repository": {"full_name": "foo/bar"}, "deployment": {}}
+        )
+        self.assertEqual(result, None)
+

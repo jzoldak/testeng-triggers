@@ -80,10 +80,15 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
         """
         Respond to the HTTP POST request sent by GitHub WebHooks
         """
-        status_code = 400
         event = self.headers.get('X-GitHub-Event')
-        if event:
-            status_code = trigger_jenkins_job(event=event, data=self.post_json)
+        try:
+            trigger_jenkins_job(event=event, data=self.post_json)
+            status_code = 200
+        except ValueError, err:
+            # Send a 400 back because the webhook did not
+            # conform to the GitHub API v3.
+            self.log_error(str(err))
+            status_code = 400
 
         # Send a response back to GitHub
         BaseHTTPRequestHandler.send_response(self, status_code)
