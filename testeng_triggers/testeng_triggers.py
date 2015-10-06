@@ -16,12 +16,12 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logging.getLogger('requests').setLevel(logging.ERROR)  # TODO: this isn't suppressing the logging, not sure why
 
 
-REPO_ORG = os.environ.get('REPO_ORG', 'jzoldak')
-REPO_NAME = os.environ.get('REPO_NAME', 'testeng-triggers')
+REPO_ORG = os.environ.get('REPO_ORG', 'foo')
+REPO_NAME = os.environ.get('REPO_NAME', 'bar')
 HANDLED_REPO = '{org}/{name}'.format(org=REPO_ORG, name=REPO_NAME)
 
-PROVISIONING_TOPIC = os.environ.get('PROVISIONING_TOPIC', 'arn:aws:sns:us-east-1:828123747931:edx-test-jenkins')
-SITESPEED_TOPIC = os.environ.get('SITESPEED_TOPIC', 'arn:aws:sns:us-east-1:828123747931:edx-test-jenkins')
+PROVISIONING_TOPIC = os.environ.get('PROVISIONING_TOPIC', 'insert_sns_arn_here')
+SITESPEED_TOPIC = os.environ.get('SITESPEED_TOPIC', 'insert_sns_arn_here')
 
 
 class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
@@ -96,17 +96,8 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
         If no POST parameters can be interpreted, return an empty dict.
         """
         contents = self.request_content
-
-        # The POST dict will contain a list of values for each key.
-        # None of our parameters are lists, however, so we map [val] --> val
-        # If the list contains multiple entries, we pick the first one
         try:
-            post_dict = urlparse.parse_qs(contents, keep_blank_values=True)
-            return {
-                key: list_val[0]
-                for key, list_val in post_dict.items()
-            }
-
+            return urlparse.parse_qs(contents, keep_blank_values=True)
         except:  # pragma: no cover
             return dict()
 
