@@ -31,8 +31,8 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
     protocol = "HTTP/1.0"
 
     @classmethod
-    def trigger_jenkins_job(cls, event, data):
-        """Parse the WebHook payload and trigger downstream jenkins jobs.
+    def parse_webhook_payload(cls, event, data):
+        """Parse the WebHook payload and trigger downstream jobs.
 
         Args:
             event (string): GitHub event
@@ -41,23 +41,8 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
         Returns:
             None if no downstream action was required
             string: MessageId of the published SNS message if a followon action should be taken
-
-        Raises:
-            ValueError when the request does not conform to the GitHub API v3.
         """
-        if not event:
-            # This is not a valid webhook from GitHub because
-            # those all send an X-GitHub-Event header.
-            LOGGER.error('The X-GitHub-Event header was not received in the request.')
-            raise ValueError()
-
         repo = data.get('repository')
-        if not repo:
-            # This is not a valid webhook from GitHub because
-            # those all return the repository info in the JSON payload
-            LOGGER.error('Invalid webhook payload: {}'.format(data))
-            raise ValueError('Invalid webhook payload: {}'.format(data))
-
         repo_name = repo.get('full_name')
         if repo_name != HANDLED_REPO:
             # We only want to take action on a specific repo, so
@@ -125,24 +110,42 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
         except:  # pragma: no cover
             return dict()
 
+    def _is_valid_gh_event(cls, event, data):
+        """ Verify that the webhook sent conforms to the GitHub API v3. """
+        if not event:
+            # This is not a valid webhook from GitHub because
+            # those all send an X-GitHub-Event header.
+            LOGGER.error('The X-GitHub-Event header was not received in the request.')
+            return False
+
+        repo = data.get('repository')
+        if not repo:
+            # This is not a valid webhook from GitHub because
+            # those all return the repository info in the JSON payload
+            LOGGER.error('Invalid webhook payload: {}'.format(data))
+            return False
+
+        return True
+
     def do_POST(self):
         """
         Respond to the HTTP POST request sent by GitHub WebHooks
         """
         event = self.headers.get('X-GitHub-Event')
-        try:
-            self.trigger_jenkins_job(event=event, data=self.post_json)
+        data = self.post_json
+
+        if self._is_valid_gh_event(event=event, data=data):
+            # Send a 200 back to GitHub regardless
             status_code = 200
-        except ValueError, err:
-            # Send a 400 back because the webhook did not
-            # conform to the GitHub API v3.
-            LOGGER.error(str(err))
+
+            try:
+                self.parse_webhook_payload(event=event, data=data)
+
+            except SnsError, err:   # pragma: no cover
+                LOGGER.error(str(err))
+
+        else:
             status_code = 400
-        except SnsError, err:   # pragma: no cover
-            # Send a 200 back to GitHub but log that there was a problem
-            # with the trigger job itself
-            LOGGER.error(str(err))
-            status_code = 200
 
         # Send a response back to GitHub
         BaseHTTPRequestHandler.send_response(self, status_code)

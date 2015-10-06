@@ -56,11 +56,11 @@ class TriggerServerTestCase(TestCase):
         self.addCleanup(self.server.shutdown)
         self.url = "http://127.0.0.1:{port}".format(port=self.server.port)
 
-    @patch("testeng_triggers.testeng_triggers.TriggerHttpRequestHandler.trigger_jenkins_job")
-    def test_github_event(self, mock_trigger):
-        mock_trigger.return_value = 'foo'
+    @patch("testeng_triggers.testeng_triggers.TriggerHttpRequestHandler.parse_webhook_payload")
+    def test_github_event(self, mock_downstream):
+        mock_downstream.return_value = 'foo'
         headers = {'X-GitHub-Event': 'foo'}
-        response = requests.post(self.url, headers=headers, data={})
+        response = requests.post(self.url, headers=headers, data={'repository': 'bar'})
         self.assertEqual(response.status_code, 200)
 
     def test_bad_github_event(self):
@@ -71,6 +71,11 @@ class TriggerServerTestCase(TestCase):
         """ Test that GET requests are not implemented, only POSTs are. """
         response = requests.get(self.url, data={})
         self.assertEqual(response.status_code, 501)
+
+    def test_bad_payload(self):
+        headers = {'X-GitHub-Event': 'foo'}
+        response = requests.post(self.url, headers=headers, data={})
+        self.assertEqual(response.status_code, 400)
 
 
 @patch('testeng_triggers.testeng_triggers.HANDLED_REPO', 'foo/bar')
@@ -90,21 +95,18 @@ class TriggerHandlerTestCase(TestCase):
         topic_arn = topics_json["ListTopicsResponse"]["ListTopicsResult"]["Topics"][0]['TopicArn']
         return topic_arn
 
-    def test_bad_payload(self):
-        self.assertRaises(ValueError, self.handler.trigger_jenkins_job, 'foo', {})
-
     def test_untriggered_repo(self):
-        result = self.handler.trigger_jenkins_job('foo', {'repository': {'full_name': 'foo/untriggered'}})
+        result = self.handler.parse_webhook_payload('foo', {'repository': {'full_name': 'foo/untriggered'}})
         self.assertEqual(result, None)
 
     def test_untriggered_event(self):
-        result = self.handler.trigger_jenkins_job('foo', {'repository': {'full_name': 'foo/bar'}})
+        result = self.handler.parse_webhook_payload('foo', {'repository': {'full_name': 'foo/bar'}})
         self.assertEqual(result, None)
 
     @mock_sns
     def test_deployment_event(self):
         with patch('testeng_triggers.testeng_triggers.PROVISIONING_TOPIC', self.create_topic()):
-            result = self.handler.trigger_jenkins_job(
+            result = self.handler.parse_webhook_payload(
                 'deployment',
                 {'repository': {'full_name': 'foo/bar'}, 'deployment': {}}
             )
@@ -112,7 +114,7 @@ class TriggerHandlerTestCase(TestCase):
             self.assertEqual(len(result), 36, msg)
 
     def test_ignored_deployment_status_event(self):
-        result = self.handler.trigger_jenkins_job(
+        result = self.handler.parse_webhook_payload(
             'deployment_status',
             {'repository': {'full_name': 'foo/bar'}, 'deployment': {}, 'deployment_status': {}}
         )
@@ -121,7 +123,7 @@ class TriggerHandlerTestCase(TestCase):
     @mock_sns
     def test_deployment_status_success_event(self):
         with patch('testeng_triggers.testeng_triggers.SITESPEED_TOPIC', self.create_topic()):
-            result = self.handler.trigger_jenkins_job(
+            result = self.handler.parse_webhook_payload(
                 'deployment_status',
                 {'repository': {'full_name': 'foo/bar'}, 'deployment': {}, 'deployment_status': {'state': 'success'}}
             )
