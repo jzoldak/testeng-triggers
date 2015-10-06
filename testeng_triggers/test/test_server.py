@@ -11,7 +11,7 @@ from moto import mock_sns
 import requests
 import threading
 
-from ..testeng_triggers import TriggerHttpRequestHandler
+from ..testeng_triggers import TriggerHttpRequestHandler, parse_webhook_payload
 
 
 class ThreadedHTTPServer(HTTPServer, object):
@@ -57,7 +57,7 @@ class TriggerServerTestCase(TestCase):
         self.addCleanup(self.server.shutdown)
         self.url = "http://127.0.0.1:{port}".format(port=self.server.port)
 
-    @patch("testeng_triggers.testeng_triggers.TriggerHttpRequestHandler.parse_webhook_payload")
+    @patch("testeng_triggers.testeng_triggers.parse_webhook_payload")
     def test_github_event(self, mock_downstream):
         mock_downstream.return_value = 'foo'
         headers = {'X-GitHub-Event': 'foo', 'content-type': 'application/json'}
@@ -65,27 +65,13 @@ class TriggerServerTestCase(TestCase):
         response = requests.post(self.url, headers=headers, data=json.dumps(payload))
         self.assertEqual(response.status_code, 200)
 
-    def test_bad_github_event(self):
-        response = requests.post(self.url, data={})
-        self.assertEqual(response.status_code, 400)
-
     def test_get_request(self):
         """ Test that GET requests are not implemented, only POSTs are. """
         response = requests.get(self.url, data={})
         self.assertEqual(response.status_code, 501)
 
-    def test_empty_payload(self):
-        headers = {'X-GitHub-Event': 'foo'}
-        response = requests.post(self.url, headers=headers, data='{}')
-        self.assertEqual(response.status_code, 400)
 
-    def test_bad_payload(self):
-        headers = {'X-GitHub-Event': 'foo'}
-        response = requests.post(self.url, headers=headers, data="{'foo': }")
-        self.assertEqual(response.status_code, 400)
-
-
-@patch('testeng_triggers.testeng_triggers.HANDLED_REPO', 'foo/bar')
+@patch('testeng_triggers.helpers.HANDLED_REPO', 'foo/bar')
 class TriggerHandlerTestCase(TestCase):
     """TestCase class for verifying the trigger handling. """
 
@@ -103,17 +89,17 @@ class TriggerHandlerTestCase(TestCase):
         return topic_arn
 
     def test_untriggered_repo(self):
-        result = self.handler.parse_webhook_payload('foo', {'repository': {'full_name': 'foo/untriggered'}})
+        result = parse_webhook_payload('foo', {'repository': {'full_name': 'foo/untriggered'}})
         self.assertEqual(result, None)
 
     def test_untriggered_event(self):
-        result = self.handler.parse_webhook_payload('foo', {'repository': {'full_name': 'foo/bar'}})
+        result = parse_webhook_payload('foo', {'repository': {'full_name': 'foo/bar'}})
         self.assertEqual(result, None)
 
     @mock_sns
     def test_deployment_event(self):
-        with patch('testeng_triggers.testeng_triggers.PROVISIONING_TOPIC', self.create_topic()):
-            result = self.handler.parse_webhook_payload(
+        with patch('testeng_triggers.helpers.PROVISIONING_TOPIC', self.create_topic()):
+            result = parse_webhook_payload(
                 'deployment',
                 {'repository': {'full_name': 'foo/bar'}, 'deployment': {}}
             )
@@ -121,7 +107,7 @@ class TriggerHandlerTestCase(TestCase):
             self.assertEqual(len(result), 36, msg)
 
     def test_ignored_deployment_status_event(self):
-        result = self.handler.parse_webhook_payload(
+        result = parse_webhook_payload(
             'deployment_status',
             {'repository': {'full_name': 'foo/bar'}, 'deployment': {}, 'deployment_status': {}}
         )
@@ -129,8 +115,8 @@ class TriggerHandlerTestCase(TestCase):
 
     @mock_sns
     def test_deployment_status_success_event(self):
-        with patch('testeng_triggers.testeng_triggers.SITESPEED_TOPIC', self.create_topic()):
-            result = self.handler.parse_webhook_payload(
+        with patch('testeng_triggers.helpers.SITESPEED_TOPIC', self.create_topic()):
+            result = parse_webhook_payload(
                 'deployment_status',
                 {'repository': {'full_name': 'foo/bar'}, 'deployment': {}, 'deployment_status': {'state': 'success'}}
             )

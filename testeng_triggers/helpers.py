@@ -10,10 +10,84 @@ from boto.exception import BotoServerError
 import logging
 LOGGER = logging.getLogger(__name__)
 
+REPO_ORG = os.environ.get('REPO_ORG', 'foo')
+REPO_NAME = os.environ.get('REPO_NAME', 'bar')
+HANDLED_REPO = '{org}/{name}'.format(org=REPO_ORG, name=REPO_NAME)
+
+PROVISIONING_TOPIC = os.environ.get('PROVISIONING_TOPIC', 'insert_sns_arn_here')
+SITESPEED_TOPIC = os.environ.get('SITESPEED_TOPIC', 'insert_sns_arn_here')
+
 
 class SnsError(Exception):
     """ Error in the communication with SNS. """
     pass
+
+
+def parse_webhook_payload(event, data):
+    """Parse the WebHook payload and trigger downstream jobs.
+
+    Args:
+        event (string): GitHub event
+        data (dict): payload from the webhook
+
+    Returns:
+        None if no downstream action was required
+        string: MessageId of the published SNS message if a followon action should be taken
+    """
+    repo = data.get('repository')
+    repo_name = repo.get('full_name')
+    if repo_name != HANDLED_REPO:
+        # We only want to take action on a specific repo, so
+        # even if another repo gets configured to send webhooks
+        # to this app send back a 200 to GitHub
+        LOGGER.debug('Unhandled repo: {}'.format(repo_name))
+        return None
+
+    msg_id = None
+
+    # Handle deployment events
+    if event == 'deployment':
+        LOGGER.debug('Deployment event passed to the handler.')
+        msg_id = handle_deployment_event(
+            PROVISIONING_TOPIC,
+            REPO_ORG,
+            REPO_NAME,
+            data.get('deployment')
+        )
+
+    # Handle deployment status events
+    elif event == 'deployment_status':
+        LOGGER.debug('Deployment status event passed to the handler.')
+        msg_id = handle_deployment_status_event(
+            SITESPEED_TOPIC,
+            REPO_ORG,
+            REPO_NAME,
+            data.get('deployment'),
+            data.get('deployment_status')
+        )
+
+    else:
+        LOGGER.debug('This event type does not need to be handled.')
+
+    return msg_id
+
+
+def is_valid_gh_event(event, data):
+    """ Verify that the webhook sent conforms to the GitHub API v3. """
+    if not event:
+        # This is not a valid webhook from GitHub because
+        # those all send an X-GitHub-Event header.
+        LOGGER.error('The X-GitHub-Event header was not received in the request.')
+        return False
+
+    repo = data.get('repository')
+    if not repo:
+        # This is not a valid webhook from GitHub because
+        # those all return the repository info in the JSON payload
+        LOGGER.error('Invalid webhook payload: {}'.format(data))
+        return False
+
+    return True
 
 
 def publish_sns_messsage(topic_arn, message):
