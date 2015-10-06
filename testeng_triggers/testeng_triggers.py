@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+import json
 from lazy import lazy
 import os
 import urlparse
@@ -55,7 +56,7 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
 
         # Handle deployment events
         if event == 'deployment':
-            LOGGER.debug('Deployment event received.')
+            LOGGER.debug('Deployment event passed to the handler.')
             msg_id = handle_deployment_event(
                 PROVISIONING_TOPIC,
                 REPO_ORG,
@@ -65,7 +66,7 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
 
         # Handle deployment status events
         elif event == 'deployment_status':
-            LOGGER.debug('Deployment status event received.')
+            LOGGER.debug('Deployment status event passed to the handler.')
             msg_id = handle_deployment_status_event(
                 SITESPEED_TOPIC,
                 REPO_ORG,
@@ -73,6 +74,9 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
                 data.get('deployment'),
                 data.get('deployment_status')
             )
+
+        else:
+            LOGGER.debug('This event type does not need to be handled.')
 
         return msg_id
 
@@ -84,7 +88,7 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
         try:
             length = int(self.headers.getheader('content-length'))
 
-        except (TypeError, ValueError):  # pragma: no cover
+        except (TypeError, ValueError):
             return ""
         else:
             return self.rfile.read(length)
@@ -92,13 +96,13 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
     @lazy
     def post_json(self):
         """
-        Retrieve the request POST parameters from the client as a dictionary.
-        If no POST parameters can be interpreted, return an empty dict.
+        Retrieve the request POST json from the client as a dictionary.
+        If no POST json can be interpreted, return an empty dict.
         """
         contents = self.request_content
         try:
-            return urlparse.parse_qs(contents, keep_blank_values=True)
-        except:  # pragma: no cover
+            return json.loads(contents)
+        except:
             return dict()
 
     def _is_valid_gh_event(cls, event, data):
@@ -125,6 +129,7 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
         event = self.headers.get('X-GitHub-Event')
         data = self.post_json
 
+        LOGGER.debug("Received GitHub event: {}".format(event))
         if self._is_valid_gh_event(event=event, data=data):
             # Send a 200 back to GitHub regardless
             status_code = 200
@@ -132,7 +137,7 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
             try:
                 self.parse_webhook_payload(event=event, data=data)
 
-            except SnsError, err:   # pragma: no cover
+            except SnsError, err:
                 LOGGER.error(str(err))
 
         else:

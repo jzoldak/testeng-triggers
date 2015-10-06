@@ -5,6 +5,7 @@ from BaseHTTPServer import HTTPServer
 from unittest import TestCase, skip
 
 from boto import connect_sns
+import json
 from mock import patch
 from moto import mock_sns
 import requests
@@ -59,8 +60,9 @@ class TriggerServerTestCase(TestCase):
     @patch("testeng_triggers.testeng_triggers.TriggerHttpRequestHandler.parse_webhook_payload")
     def test_github_event(self, mock_downstream):
         mock_downstream.return_value = 'foo'
-        headers = {'X-GitHub-Event': 'foo'}
-        response = requests.post(self.url, headers=headers, data={'repository': 'bar'})
+        headers = {'X-GitHub-Event': 'foo', 'content-type': 'application/json'}
+        payload = {'repository': 'bar'}
+        response = requests.post(self.url, headers=headers, data=json.dumps(payload))
         self.assertEqual(response.status_code, 200)
 
     def test_bad_github_event(self):
@@ -72,9 +74,14 @@ class TriggerServerTestCase(TestCase):
         response = requests.get(self.url, data={})
         self.assertEqual(response.status_code, 501)
 
+    def test_empty_payload(self):
+        headers = {'X-GitHub-Event': 'foo'}
+        response = requests.post(self.url, headers=headers, data='{}')
+        self.assertEqual(response.status_code, 400)
+
     def test_bad_payload(self):
         headers = {'X-GitHub-Event': 'foo'}
-        response = requests.post(self.url, headers=headers, data={})
+        response = requests.post(self.url, headers=headers, data="{'foo': }")
         self.assertEqual(response.status_code, 400)
 
 
