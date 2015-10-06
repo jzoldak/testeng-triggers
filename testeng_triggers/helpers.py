@@ -7,6 +7,9 @@ import os
 from boto import connect_sns
 from boto.exception import BotoServerError
 
+import logging
+LOGGER = logging.getLogger(__name__)
+
 
 class SnsError(Exception):
     """ Error in the communication with SNS. """
@@ -27,6 +30,7 @@ def publish_sns_messsage(topic_arn, message):
         SnsError when publising was unsuccessful
     """
     try:
+        LOGGER.debug('Publishing to {}. Message is {}'.format(topic_arn, message))
         conn = connect_sns()
         response = conn.publish(topic=topic_arn, message=message)
 
@@ -44,12 +48,15 @@ def publish_sns_messsage(topic_arn, message):
     publish_response = response.get('PublishResponse')
     publish_result = publish_response and publish_response.get('PublishResult')
     message_id = publish_result.get('MessageId')
+
     if not message_id:
         raise SnsError('Could not publish message. Response was: {}'.format(publish_response))  # pragma: no cover
+
+    LOGGER.debug('Successfully published MessageId {}'.format(message_id))
     return message_id
 
 
-def compose_sns_message(repo_org, repo_name):
+def _compose_sns_message(repo_org, repo_name):
     """ Compose the message to publish to the SNS topic.
 
     Note that an SQS queue must be subscribed to the SNS topic, the Jenkins main configuration
@@ -93,7 +100,10 @@ def handle_deployment_event(topic, repo_org, repo_name, deployment):
     #
     # The provisioning job will need to post a deployment status event with 'state' equal to
     # 'success' in order to trigger the next job in the pipeline.
-    msg_id = publish_sns_messsage(topic_arn=topic, message=compose_sns_message(repo_org, repo_name))
+    LOGGER.info('Received deployment event')
+    LOGGER.debug(deployment)
+
+    msg_id = publish_sns_messsage(topic_arn=topic, message=_compose_sns_message(repo_org, repo_name))
     return msg_id
 
 
@@ -113,12 +123,15 @@ def handle_deployment_status_event(topic, repo_org, repo_name, deployment, deplo
         None if no action was required or
         string: the message ID of the published message
     """
+    LOGGER.info('Received deployment status event')
+    LOGGER.debug(deployment_status)
+
     state = deployment_status.get('state')
 
     if state == 'success':
         # Continue the next job in the pipeline by publishing an SNS message that will trigger
         # the sitespeed job.
-        msg_id = publish_sns_messsage(topic_arn=topic, message=compose_sns_message(repo_org, repo_name))
+        msg_id = publish_sns_messsage(topic_arn=topic, message=_compose_sns_message(repo_org, repo_name))
         return msg_id
 
     return None

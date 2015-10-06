@@ -3,7 +3,6 @@
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from lazy import lazy
 import os
-import threading
 import urlparse
 
 from helpers import SnsError, handle_deployment_event, handle_deployment_status_event
@@ -150,50 +149,12 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
         LOGGER.debug("Sent HTTP response: {}".format(status_code))
 
 
-class TriggerHTTPServer(HTTPServer, object):
-    """
-    HTTP server implementation.
-    """
-    def __init__(self, port_num=0):
-        """
-        Configure the server to listen on localhost.
-        Default is to choose an arbitrary open port.
-        """
-        address = ('0.0.0.0', port_num)
-        HTTPServer.__init__(self, address, TriggerHttpRequestHandler)
-
-        # Log the port we're using to help identify port conflict errors
-        LOGGER.debug('Starting service on port {0}'.format(self.port))
-
-        # Start the server in a separate thread
-        server_thread = threading.Thread(target=self.serve_forever)
-        server_thread.daemon = True
-        server_thread.start()
-
-    def shutdown(self):
-        """
-        Stop the server and free up the port
-        """
-        LOGGER.info('Shutting down the server')
-
-        # First call superclass shutdown()
-        HTTPServer.shutdown(self)
-
-        # We also need to manually close the socket
-        self.socket.close()
-
-    @property
-    def port(self):
-        """
-        Return the port that the service is listening on.
-        """
-        _, port = self.server_address
-        return port
-
-
-def run():  # pragma: no cover
+def run(server_class=HTTPServer, handler_class=TriggerHttpRequestHandler):  # pragma: no cover
     port = int(os.environ.get('PORT', '0'))
-    httpd = TriggerHTTPServer(port_num=port)
+    server_address = ('', port)
+    httpd = server_class(server_address, handler_class)
+    LOGGER.debug('Starting service on port {0}'.format(port))
+    httpd.serve_forever()
 
 
 if __name__ == "__main__":

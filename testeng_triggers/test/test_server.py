@@ -1,14 +1,48 @@
 """
 Tests for the HTTP server
 """
+from BaseHTTPServer import HTTPServer
 from unittest import TestCase, skip
 
 from boto import connect_sns
 from mock import patch
 from moto import mock_sns
 import requests
+import threading
 
-from ..testeng_triggers import TriggerHTTPServer, TriggerHttpRequestHandler
+from ..testeng_triggers import TriggerHttpRequestHandler
+
+
+class ThreadedHTTPServer(HTTPServer, object):
+    """ HTTP server implementation for testing.
+
+    Configure the server to listen on an arbitrary open port on localhost.
+    Start it up in a separate thread so that it can be shutdown by another thread.
+    """
+    def __init__(self):
+        """
+        """
+        address = ('0.0.0.0', 0)
+        HTTPServer.__init__(self, address, TriggerHttpRequestHandler)
+
+        server_thread = threading.Thread(target=self.serve_forever)
+        server_thread.daemon = True
+        server_thread.start()
+
+    def shutdown(self):
+        """
+        Stop the server and free up the port
+        """
+        HTTPServer.shutdown(self)
+        self.socket.close()
+
+    @property
+    def port(self):
+        """
+        Return the port that the service is listening on.
+        """
+        _, port = self.server_address
+        return port
 
 
 class TriggerServerTestCase(TestCase):
@@ -18,7 +52,7 @@ class TriggerServerTestCase(TestCase):
     def setUp(self):
         """These tests start the server to test it. """
         super(TriggerServerTestCase, self).setUp()
-        self.server = TriggerHTTPServer()
+        self.server = ThreadedHTTPServer()
         self.addCleanup(self.server.shutdown)
         self.url = "http://127.0.0.1:{port}".format(port=self.server.port)
 

@@ -7,7 +7,7 @@ from unittest import TestCase
 from boto import connect_sns
 from mock import patch
 from moto import mock_sns
-from ..helpers import publish_sns_messsage, SnsError, compose_sns_message
+from ..helpers import publish_sns_messsage, SnsError, _compose_sns_message
 
 
 @mock_sns
@@ -30,7 +30,7 @@ class HelperTestCase(TestCase):
         self.assertIsNotNone(msg_id)
 
     def test_compose_message(self):
-        msg = compose_sns_message('org', 'repo')
+        msg = _compose_sns_message('org', 'repo')
         self.assertEqual(
             msg,
             {'default': '{"owner": {"name": "org"}, "url": "https://github.com/org/repo", "name": "repo"}'}
