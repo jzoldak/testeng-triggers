@@ -1,22 +1,28 @@
 #!/usr/bin/env python
 
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-import urlparse
-import threading
-
 from lazy import lazy
+import os
+import threading
+import urlparse
 
 from helpers import SnsError, handle_deployment_event, handle_deployment_status_event
 
-from logging import getLogger
-LOGGER = getLogger(__name__)
+import logging
+import sys
+LOGGER = logging.getLogger(__name__)
 
-REPO_ORG = 'jzoldak'
-REPO_NAME = 'testeng-triggers'
+# Send the output to stdout so it will get handled with the Heroku logging service
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.getLogger('requests').setLevel(logging.ERROR)  # TODO: this isn't suppressing the logging, not sure why
+
+
+REPO_ORG = os.environ.get('REPO_ORG', 'jzoldak')
+REPO_NAME = os.environ.get('REPO_NAME', 'testeng-triggers')
 HANDLED_REPO = '{org}/{name}'.format(org=REPO_ORG, name=REPO_NAME)
 
-PROVISIONING_TOPIC = 'arn:aws:sns:us-east-1:828123747931:edx-test-jenkins'
-SITESPEED_TOPIC = 'arn:aws:sns:us-east-1:828123747931:edx-test-jenkins'
+PROVISIONING_TOPIC = os.environ.get('PROVISIONING_TOPIC', 'arn:aws:sns:us-east-1:828123747931:edx-test-jenkins')
+SITESPEED_TOPIC = os.environ.get('SITESPEED_TOPIC', 'arn:aws:sns:us-east-1:828123747931:edx-test-jenkins')
 
 
 class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
@@ -24,30 +30,6 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
     Handler for the HTTP service.
     """
     protocol = "HTTP/1.0"
-
-    def _format_msg(self, format_str, *args):
-        """
-        Format message for logging.
-        `format_str` is a string with old-style Python format escaping;
-        `args` is an array of values to fill into the string.
-        """
-        return u"{0} - - [{1}] {2}\n".format(
-            self.client_address[0],
-            self.log_date_time_string(),
-            format_str % args
-        )
-
-    def log_message(self, format_str, *args):
-        """
-        Redirect messages to keep the test console clean.
-        """
-        LOGGER.debug(self._format_msg(format_str, *args))
-
-    def log_error(self, format_str, *args):
-        """
-        Helper to log a server error.
-        """
-        LOGGER.error(self._format_msg(format_str, *args))
 
     @classmethod
     def trigger_jenkins_job(cls, event, data):
@@ -64,30 +46,32 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
         Raises:
             ValueError when the request does not conform to the GitHub API v3.
         """
-        # TODO - add logging in this method
-
         if not event:
             # This is not a valid webhook from GitHub because
             # those all send an X-GitHub-Event header.
-            raise ValueError('The X-GitHub-Event header was not received in the request.')
+            LOGGER.error('The X-GitHub-Event header was not received in the request.')
+            raise ValueError()
 
         repo = data.get('repository')
         if not repo:
             # This is not a valid webhook from GitHub because
             # those all return the repository info in the JSON payload
-            raise ValueError('Invalid payload: {}'.format(data))
+            LOGGER.error('Invalid webhook payload: {}'.format(data))
+            raise ValueError('Invalid webhook payload: {}'.format(data))
 
         repo_name = repo.get('full_name')
         if repo_name != HANDLED_REPO:
             # We only want to take action on a specific repo, so
             # even if another repo gets configured to send webhooks
             # to this app send back a 200 to GitHub
+            LOGGER.debug('Unhandled repo: {}'.format(repo_name))
             return None
 
         msg_id = None
 
         # Handle deployment events
         if event == 'deployment':
+            LOGGER.debug('Deployment event received.')
             msg_id = handle_deployment_event(
                 PROVISIONING_TOPIC,
                 REPO_ORG,
@@ -97,6 +81,7 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
 
         # Handle deployment status events
         elif event == 'deployment_status':
+            LOGGER.debug('Deployment status event received.')
             msg_id = handle_deployment_status_event(
                 SITESPEED_TOPIC,
                 REPO_ORG,
@@ -115,7 +100,7 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
         try:
             length = int(self.headers.getheader('content-length'))
 
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # pragma: no cover
             return ""
         else:
             return self.rfile.read(length)
@@ -138,7 +123,7 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
                 for key, list_val in post_dict.items()
             }
 
-        except:
+        except:  # pragma: no cover
             return dict()
 
     def do_POST(self):
@@ -152,17 +137,17 @@ class TriggerHttpRequestHandler(BaseHTTPRequestHandler, object):
         except ValueError, err:
             # Send a 400 back because the webhook did not
             # conform to the GitHub API v3.
-            self.log_error(str(err))
+            LOGGER.error(str(err))
             status_code = 400
-        except SnsError, err:
+        except SnsError, err:   # pragma: no cover
             # Send a 200 back to GitHub but log that there was a problem
             # with the trigger job itself
-            self.log_error(str(err))
+            LOGGER.error(str(err))
             status_code = 200
 
         # Send a response back to GitHub
         BaseHTTPRequestHandler.send_response(self, status_code)
-        self.log_message("Sent HTTP response: {}".format(status_code))
+        LOGGER.debug("Sent HTTP response: {}".format(status_code))
 
 
 class TriggerHTTPServer(HTTPServer, object):
@@ -189,6 +174,8 @@ class TriggerHTTPServer(HTTPServer, object):
         """
         Stop the server and free up the port
         """
+        LOGGER.info('Shutting down the server')
+
         # First call superclass shutdown()
         HTTPServer.shutdown(self)
 
@@ -204,10 +191,10 @@ class TriggerHTTPServer(HTTPServer, object):
         return port
 
 
-def run():
+def run():  # pragma: no cover
     port = int(os.environ.get('PORT', '0'))
     httpd = TriggerHTTPServer(port_num=port)
 
 
 if __name__ == "__main__":
-    run()
+    run()  # pragma: no cover

@@ -45,7 +45,7 @@ def publish_sns_messsage(topic_arn, message):
     publish_result = publish_response and publish_response.get('PublishResult')
     message_id = publish_result.get('MessageId')
     if not message_id:
-        raise SnsError('Could not publish message. Response was: {}'.format(publish_response))
+        raise SnsError('Could not publish message. Response was: {}'.format(publish_response))  # pragma: no cover
     return message_id
 
 

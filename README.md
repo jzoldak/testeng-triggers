@@ -1,6 +1,6 @@
 # testeng-triggers
 Use GitHub webhook events to trigger CI/CD pipeline jobs by inspecting the payload
-and making requests to trigger various jenkins jobs.
+and posting to SNS to trigger various jenkins jobs.
 
 To test out locally:
 
@@ -43,6 +43,6 @@ nosetests
 To run a single test, add the testspec to the nosetests command. Here are some examples:
 ```
 nosetests testeng_triggers/test/test_helpers.py
-nosetests testeng_triggers/test/test_helpers.py:TriggerHelpersTestCase
-nosetests testeng_triggers/test/test_helpers.py:TriggerHelpersTestCase.test_deployment_event
+nosetests testeng_triggers/test/test_helpers.py:HelperTestCase
+nosetests testeng_triggers/test/test_helpers.py:HelperTestCase.test_publish_to_topic
 ```

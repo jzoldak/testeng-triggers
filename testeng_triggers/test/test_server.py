@@ -1,9 +1,11 @@
 """
 Tests for the HTTP server
 """
-from unittest import TestCase
+from unittest import TestCase, skip
 
+from boto import connect_sns
 from mock import patch
+from moto import mock_sns
 import requests
 
 from ..testeng_triggers import TriggerHTTPServer, TriggerHttpRequestHandler
@@ -45,6 +47,15 @@ class TriggerHandlerTestCase(TestCase):
         super(TriggerHandlerTestCase, self).setUp()
         self.handler = TriggerHttpRequestHandler
 
+    @classmethod
+    def create_topic(cls):
+        """ Create a topic so that we can publish to it. """
+        conn = connect_sns()
+        conn.create_topic("some-topic")
+        topics_json = conn.get_all_topics()
+        topic_arn = topics_json["ListTopicsResponse"]["ListTopicsResult"]["Topics"][0]['TopicArn']
+        return topic_arn
+
     def test_bad_payload(self):
         self.assertRaises(ValueError, self.handler.trigger_jenkins_job, 'foo', {})
 
@@ -56,13 +67,15 @@ class TriggerHandlerTestCase(TestCase):
         result = self.handler.trigger_jenkins_job('foo', {'repository': {'full_name': 'foo/bar'}})
         self.assertEqual(result, None)
 
+    @mock_sns
     def test_deployment_event(self):
-        result = self.handler.trigger_jenkins_job(
-            'deployment',
-            {'repository': {'full_name': 'foo/bar'}, 'deployment': {}}
-        )
-        msg = 'Expected MessageID {} to be a 36 digit string'.format(result)
-        self.assertEqual(len(result), 36, msg)
+        with patch('testeng_triggers.testeng_triggers.PROVISIONING_TOPIC', self.create_topic()):
+            result = self.handler.trigger_jenkins_job(
+                'deployment',
+                {'repository': {'full_name': 'foo/bar'}, 'deployment': {}}
+            )
+            msg = 'Expected MessageID {} to be a 36 digit string'.format(result)
+            self.assertEqual(len(result), 36, msg)
 
     def test_ignored_deployment_status_event(self):
         result = self.handler.trigger_jenkins_job(
@@ -71,10 +84,12 @@ class TriggerHandlerTestCase(TestCase):
         )
         self.assertEqual(result, None)
 
+    @mock_sns
     def test_deployment_status_success_event(self):
-        result = self.handler.trigger_jenkins_job(
-            'deployment_status',
-            {'repository': {'full_name': 'foo/bar'}, 'deployment': {}, 'deployment_status': {'state': 'success'}}
-        )
-        msg = 'Expected MessageID {} to be a 36 digit string'.format(result)
-        self.assertEqual(len(result), 36, msg)
+        with patch('testeng_triggers.testeng_triggers.SITESPEED_TOPIC', self.create_topic()):
+            result = self.handler.trigger_jenkins_job(
+                'deployment_status',
+                {'repository': {'full_name': 'foo/bar'}, 'deployment': {}, 'deployment_status': {'state': 'success'}}
+            )
+            msg = 'Expected MessageID {} to be a 36 digit string'.format(result)
+            self.assertEqual(len(result), 36, msg)
