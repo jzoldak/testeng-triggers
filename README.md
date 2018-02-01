@@ -25,4 +25,3 @@ To deploy on heroku:
 * In the heroku app dashboard, under Settings, add Config var values for environment variables that your script needs.
 * You can now test out the forward proxy with the above curl statement, using the URL of your heroku app instead
 of localhost. Either http or https will work, heroku handles the routing for you.
-
